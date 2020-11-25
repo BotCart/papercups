@@ -127,7 +127,7 @@ class Login extends React.Component<Props, State> {
                 htmlType="submit"
                 loading={loading}
               >
-                Log in
+                Sign In
               </Button>
             </Box>
 
