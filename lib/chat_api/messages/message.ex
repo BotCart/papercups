@@ -6,25 +6,28 @@ defmodule ChatApi.Messages.Message do
   alias ChatApi.Accounts.Account
   alias ChatApi.Customers.Customer
   alias ChatApi.Users.User
+  alias ChatApi.Messages.MessageFile
 
   @type t :: %__MODULE__{
           body: String.t(),
-          sent_at: any(),
-          seen_at: any(),
-          source: String.t() | nil,
-          metadata: any(),
+          sent_at: DateTime.t() | nil,
+          seen_at: DateTime.t() | nil,
+          source: String.t(),
+          type: String.t(),
+          private: boolean() | nil,
+          metadata: map() | nil,
           # Foreign keys
-          conversation_id: any(),
+          conversation_id: Ecto.UUID.t(),
           conversation: any(),
-          account_id: any(),
+          account_id: Ecto.UUID.t(),
           account: any(),
-          customer_id: any(),
+          customer_id: Ecto.UUID.t(),
           customer: any(),
-          user_id: any(),
+          user_id: integer(),
           user: any(),
           # Timestamps
-          inserted_at: any(),
-          updated_at: any()
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
         }
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -42,6 +45,9 @@ defmodule ChatApi.Messages.Message do
     belongs_to(:account, Account)
     belongs_to(:customer, Customer)
     belongs_to(:user, User, type: :integer)
+
+    has_many(:message_files, MessageFile)
+    has_many(:attachments, through: [:message_files, :file])
 
     timestamps()
   end
@@ -62,7 +68,7 @@ defmodule ChatApi.Messages.Message do
       :source,
       :metadata
     ])
-    |> validate_required([:body, :account_id, :conversation_id])
+    |> validate_required([:account_id, :conversation_id])
     |> validate_inclusion(:type, ["reply", "note"])
     |> validate_inclusion(:source, ["chat", "slack", "email"])
   end

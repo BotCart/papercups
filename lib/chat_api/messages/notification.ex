@@ -16,9 +16,8 @@ defmodule ChatApi.Messages.Notification do
     })
   end
 
-  # TODO: rename to `broadcast_to_customer` or something more explicit?
-  @spec broadcast_to_conversation!(Message.t()) :: Message.t()
-  def broadcast_to_conversation!(%Message{} = message) do
+  @spec broadcast_to_customer!(Message.t()) :: Message.t()
+  def broadcast_to_customer!(%Message{private: false} = message) do
     message
     |> Helpers.get_conversation_topic()
     |> ChatApiWeb.Endpoint.broadcast!("shout", Helpers.format(message))
@@ -26,21 +25,44 @@ defmodule ChatApi.Messages.Notification do
     message
   end
 
-  @spec notify(Message.t(), atom()) :: Message.t()
-  def notify(
-        %Message{body: _body, conversation_id: _conversation_id} = message,
-        :slack
-      ) do
-    Logger.info("Sending notification: :slack")
+  def broadcast_to_customer!(message), do: message
 
-    Task.start(fn ->
-      ChatApi.Slack.Notifications.notify_primary_channel(message)
-    end)
+  @spec broadcast_to_admin!(Message.t()) :: Message.t()
+  def broadcast_to_admin!(%Message{} = message) do
+    message
+    |> Helpers.get_admin_topic()
+    |> ChatApiWeb.Endpoint.broadcast!("shout", Helpers.format(message))
 
     message
   end
 
-  def notify(%Message{account_id: account_id} = message, :webhooks) do
+  @spec notify(Message.t(), atom(), keyword()) :: Message.t()
+  def notify(message, type, opts \\ [])
+
+  def notify(
+        %Message{body: _body, conversation_id: _conversation_id} = message,
+        :slack,
+        opts
+      ) do
+    Logger.info("Sending notification: :slack")
+
+    case opts do
+      [metadata: %{"send_to_reply_channel" => false}] ->
+        nil
+
+      [async: false] ->
+        ChatApi.Slack.Notification.notify_primary_channel(message)
+
+      _ ->
+        Task.start(fn ->
+          ChatApi.Slack.Notification.notify_primary_channel(message)
+        end)
+    end
+
+    message
+  end
+
+  def notify(%Message{account_id: account_id} = message, :webhooks, _opts) do
     Logger.info("Sending notification: :webhooks")
     # TODO: how should we handle errors/retry logic?
     Task.start(fn ->
@@ -50,7 +72,7 @@ defmodule ChatApi.Messages.Notification do
     message
   end
 
-  def notify(%Message{} = message, :new_message_email) do
+  def notify(%Message{} = message, :new_message_email, _opts) do
     Logger.info("Sending notification: :new_message_email")
     # TODO: how should we handle errors/retry logic?
     Task.start(fn ->
@@ -60,10 +82,10 @@ defmodule ChatApi.Messages.Notification do
     message
   end
 
-  def notify(%Message{} = message, :conversation_reply_email) do
+  def notify(%Message{private: false} = message, :conversation_reply_email, _opts) do
     Logger.info("Sending notification: :conversation_reply_email")
-    # 2 minutes (TODO: make this configurable?)
-    schedule_in = 2 * 60
+    # 20 minutes (TODO: make this configurable?)
+    schedule_in = 20 * 60
     formatted = Helpers.format(message)
 
     # TODO: not sure the best way to handle this, but basically we want to only
@@ -77,28 +99,36 @@ defmodule ChatApi.Messages.Notification do
     message
   end
 
-  def notify(%Message{} = message, :slack_company_channel) do
+  def notify(%Message{private: false} = message, :slack_company_channel, _opts) do
     Logger.info("Sending notification: :slack_company_channel")
 
     Task.start(fn ->
-      ChatApi.Slack.Notifications.notify_company_channel(message)
+      ChatApi.Slack.Notification.notify_company_channel(message)
     end)
 
     message
   end
 
   # TODO: come up with a better name... it's not super clear what `slack_support_channel` means!
-  def notify(%Message{} = message, :slack_support_channel) do
+  def notify(%Message{private: false} = message, :slack_support_channel, _opts) do
     Logger.info("Sending notification: :slack_support_channel")
 
     Task.start(fn ->
-      ChatApi.Slack.Notifications.notify_support_channel(message)
+      ChatApi.Slack.Notification.notify_support_channel(message)
     end)
 
     message
   end
 
-  def notify(message, type) do
+  def notify(%Message{private: true} = message, type, _opts) do
+    Logger.debug(
+      "Skipping notification type #{inspect(type)} for private message #{inspect(message)}"
+    )
+
+    message
+  end
+
+  def notify(message, type, _opts) do
     Logger.error(
       "Unrecognized notification type #{inspect(type)} for message #{inspect(message)}"
     )

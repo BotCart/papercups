@@ -69,11 +69,46 @@ defmodule ChatApi.Slack.Client do
     end
   end
 
+  @spec get_message_permalink(binary(), binary(), binary()) :: {:ok, nil} | Tesla.Env.result()
+  def get_message_permalink(channel, ts, access_token) do
+    if should_execute?(access_token) do
+      get("/chat.getPermalink",
+        query: [channel: channel, message_ts: ts],
+        headers: [
+          {"Authorization", "Bearer " <> access_token}
+        ]
+      )
+    else
+      # Inspect what would've been sent for debugging
+      Logger.info(
+        "Would have gotten permalink for message #{inspect(ts)} from channel #{inspect(channel)}"
+      )
+
+      {:ok, nil}
+    end
+  end
+
   @spec retrieve_user_info(binary(), binary()) :: {:ok, nil} | Tesla.Env.result()
   def retrieve_user_info(user_id, access_token) do
     if should_execute?(access_token) do
       get("/users.info",
         query: [user: user_id],
+        headers: [
+          {"Authorization", "Bearer " <> access_token}
+        ]
+      )
+    else
+      Logger.info("Invalid access token")
+
+      {:ok, nil}
+    end
+  end
+
+  @spec retrieve_bot_info(binary(), binary()) :: {:ok, nil} | Tesla.Env.result()
+  def retrieve_bot_info(bot_id, access_token) do
+    if should_execute?(access_token) do
+      get("/bots.info",
+        query: [bot: bot_id],
         headers: [
           {"Authorization", "Bearer " <> access_token}
         ]
@@ -102,12 +137,45 @@ defmodule ChatApi.Slack.Client do
     end
   end
 
+  @spec list_users(binary()) :: {:ok, nil} | Tesla.Env.result()
+  def list_users(access_token) do
+    if should_execute?(access_token) do
+      get("/users.list",
+        query: [],
+        headers: [
+          {"Authorization", "Bearer " <> access_token}
+        ]
+      )
+    else
+      Logger.info("Invalid access token")
+
+      {:ok, nil}
+    end
+  end
+
   @spec retrieve_channel_info(binary(), binary()) :: {:ok, nil} | Tesla.Env.result()
   def retrieve_channel_info(channel, access_token) do
-    # TODO: we need channels:read scope to access this
+    # NB: we need channels:read scope to access this
     if should_execute?(access_token) do
       get("/conversations.info",
         query: [channel: channel],
+        headers: [
+          {"Authorization", "Bearer " <> access_token}
+        ]
+      )
+    else
+      Logger.info("Invalid access token")
+
+      {:ok, nil}
+    end
+  end
+
+  @spec retrieve_conversation_replies(binary(), binary(), binary()) ::
+          {:ok, nil} | Tesla.Env.result()
+  def retrieve_conversation_replies(channel, thread_ts, access_token) do
+    if should_execute?(access_token) do
+      get("/conversations.replies",
+        query: [channel: channel, ts: thread_ts],
         headers: [
           {"Authorization", "Bearer " <> access_token}
         ]

@@ -11,7 +11,10 @@ import ChatMessageBox from './ChatMessageBox';
 
 dayjs.extend(utc);
 
-const getSenderIdentifier = (customer?: Customer | null, user?: User) => {
+export const getSenderIdentifier = (
+  customer?: Customer | null,
+  user?: User
+) => {
   if (user) {
     const {display_name, full_name, email} = user;
 
@@ -25,27 +28,40 @@ const getSenderIdentifier = (customer?: Customer | null, user?: User) => {
   }
 };
 
-const SenderAvatar = ({
+export const getSenderProfilePhoto = (
+  customer?: Customer | null,
+  user?: User
+) => {
+  if (user) {
+    return user.profile_photo_url || null;
+  } else if (customer) {
+    return customer.profile_photo_url || null;
+  } else {
+    return null;
+  }
+};
+
+export const SenderAvatar = ({
   isAgent,
   name,
-  user,
+  profilePhotoUrl,
+  size = 32,
   color = colors.gold,
 }: {
   isAgent: boolean;
   name: string;
-  user?: User;
+  profilePhotoUrl?: string | null;
+  size?: number;
   color?: string;
 }) => {
-  const profilePhotoUrl = user && user.profile_photo_url;
-
   if (profilePhotoUrl) {
     return (
       <Tooltip title={name}>
         <Box
           mr={2}
           style={{
-            height: 32,
-            width: 32,
+            height: size,
+            width: size,
             borderRadius: '50%',
             justifyContent: 'center',
             alignItems: 'center',
@@ -65,8 +81,9 @@ const SenderAvatar = ({
         mr={2}
         sx={{
           bg: isAgent ? colors.primary : color,
-          height: 32,
-          width: 32,
+          height: size,
+          width: size,
+          fontSize: size < 24 ? 12 : 'inherit',
           borderRadius: '50%',
           justifyContent: 'center',
           alignItems: 'center',
@@ -76,7 +93,9 @@ const SenderAvatar = ({
         {isAgent ? (
           name.slice(0, 1).toUpperCase()
         ) : (
-          <UserOutlined style={{color: colors.white}} />
+          <UserOutlined
+            style={{color: colors.white, fontSize: size < 24 ? 12 : 'inherit'}}
+          />
         )}
       </Flex>
     </Tooltip>
@@ -85,7 +104,6 @@ const SenderAvatar = ({
 
 type Props = {
   message: Message;
-  customer?: Customer | null;
   isMe?: boolean;
   isLastInGroup?: boolean;
   shouldDisplayTimestamp?: boolean;
@@ -93,7 +111,6 @@ type Props = {
 
 const ChatMessage = ({
   message,
-  customer,
   isMe,
   isLastInGroup,
   shouldDisplayTimestamp,
@@ -102,9 +119,11 @@ const ChatMessage = ({
     body,
     sent_at,
     created_at,
+    customer,
     user,
     seen_at,
     private: isPrivate,
+    attachments = [],
   } = message;
   const isAgent = !!user;
   const tooltip = getSenderIdentifier(customer, user);
@@ -114,7 +133,10 @@ const ChatMessage = ({
   const formattedSeenAt = seenAt ? formatRelativeTime(seenAt) : null;
   const customerId = customer && customer.id;
   const color = getColorByUuid(customerId);
+  const profilePhotoUrl = getSenderProfilePhoto(customer, user);
 
+  // TODO: might be nice to push the boolean logic related to color down to the ChatMessageBox
+  // Maybe have PrivateChatMessageBox, ChatMessageBox, OtherCustomerMessageBox
   if (isMe) {
     return (
       <Box pr={0} pl={4} pb={isLastInGroup ? 3 : 2}>
@@ -127,6 +149,8 @@ const ChatMessage = ({
               py: 2,
               background: isPrivate ? colors.note : colors.primary,
             }}
+            attachmentTextColor={isPrivate ? colors.text : colors.white}
+            attachments={attachments}
           />
         </Flex>
         {shouldDisplayTimestamp && (
@@ -147,7 +171,7 @@ const ChatMessage = ({
       <Flex sx={{justifyContent: 'flex-start', alignItems: 'center'}}>
         <SenderAvatar
           name={tooltip}
-          user={user}
+          profilePhotoUrl={profilePhotoUrl}
           isAgent={isAgent}
           color={color}
         />
@@ -159,6 +183,7 @@ const ChatMessage = ({
             background: isPrivate ? colors.note : 'rgb(245, 245, 245)',
             maxWidth: '80%',
           }}
+          attachments={attachments}
         />
       </Flex>
       {shouldDisplayTimestamp && (

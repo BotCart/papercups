@@ -40,6 +40,11 @@ defmodule ChatApiWeb.NotificationChannel do
         |> Map.merge(%{"user_id" => user_id, "account_id" => account_id})
         |> Messages.create_message()
 
+      case Map.get(payload, "file_ids") do
+        file_ids when is_list(file_ids) -> Messages.create_attachments(message, file_ids)
+        _ -> nil
+      end
+
       message
       |> Map.get(:id)
       |> Messages.get_message!()
@@ -90,19 +95,21 @@ defmodule ChatApiWeb.NotificationChannel do
 
   @spec broadcast_new_message(Message.t(), any()) :: Message.t()
   defp broadcast_new_message(%Message{private: true} = message, socket) do
-    # For private messages, we only need to broadcast back to the admin channel
-    # (We avoid broadcasting to the customer channel or Slack or email)
-    # TODO: broadcast to webhooks and internal Slack channel?
+    # For private messages, we only need to broadcast back to the admin channel,
+    # the internal Slack channel, and webhooks. (We avoid broadcasting to the
+    # customer channel or any public Slack channel or email.)
     broadcast(socket, "shout", Messages.Helpers.format(message))
 
     message
+    |> Messages.Notification.notify(:slack)
+    |> Messages.Notification.notify(:webhooks)
   end
 
   defp broadcast_new_message(message, socket) do
     broadcast(socket, "shout", Messages.Helpers.format(message))
 
     message
-    |> Messages.Notification.broadcast_to_conversation!()
+    |> Messages.Notification.broadcast_to_customer!()
     |> Messages.Notification.notify(:slack)
     |> Messages.Notification.notify(:slack_support_channel)
     |> Messages.Notification.notify(:slack_company_channel)

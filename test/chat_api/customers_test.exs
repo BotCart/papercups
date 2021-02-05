@@ -14,6 +14,7 @@ defmodule ChatApi.CustomersTest do
       email: "user@test.com",
       phone: "+16501235555",
       time_zone: "America/New_York",
+      profile_photo_url: "https://photo.jpg",
       current_url:
         "http://test.com/ls2bPjyYDELWL6VRpDKs9K6MrRv3O7E3F4XNZs7z4_A9gyLwBXsBZprWanwpRRNamQNFRCz9zWkixYgBPRq4mb79RF_153UHxpMg1Ct-uDfQ6SwnEGiwheWI8SraUwuEjs_GD8Cm85ziMEdFkrzNfj9NqpFOQch91YSq3wTq-7PDV4nbNd2z-IGW4CpQgXKS7DNWvrA6yKOgCSmI2OXqFNX_-PLrCseuWNJH6aYXPBKrlVZxzwOtobFV1vgWafoe",
       pathname:
@@ -25,7 +26,7 @@ defmodule ChatApi.CustomersTest do
 
     setup do
       account = insert(:account)
-      customer = insert(:customer, account: account)
+      customer = insert(:customer, account: account, company: nil)
 
       {:ok, account: account, customer: customer}
     end
@@ -118,6 +119,7 @@ defmodule ChatApi.CustomersTest do
       assert customer.time_zone == @update_attrs.time_zone
       assert customer.current_url == @update_attrs.current_url
       assert customer.pathname == @update_attrs.pathname
+      assert customer.profile_photo_url == @update_attrs.profile_photo_url
     end
 
     test "update_customer_metadata/2 only updates customizable fields",
@@ -303,6 +305,61 @@ defmodule ChatApi.CustomersTest do
 
       assert {:error, _error} =
                Customers.create_or_update_by_email(nil, account.id, %{name: "New Customer"})
+    end
+
+    test "create_or_update_by_external_id/3 finds the matching customer", %{account: account} do
+      external_id = "a0xxxxxxx1yz"
+      %{id: customer_id} = insert(:customer, %{external_id: external_id, account: account})
+
+      assert {:ok, %Customer{id: ^customer_id}} =
+               Customers.create_or_update_by_external_id(external_id, account.id)
+    end
+
+    test "create_or_update_by_external_id/3 updates the matching customer", %{account: account} do
+      external_id = "a0xxxxxxx1yz"
+      name = "Test User"
+      %{id: customer_id} = insert(:customer, %{external_id: external_id, account: account})
+
+      assert {:ok, %Customer{id: ^customer_id, name: ^name}} =
+               Customers.create_or_update_by_external_id(external_id, account.id, %{name: name})
+    end
+
+    test "create_or_update_by_external_id/3 creates a new customer if necessary", %{
+      account: account
+    } do
+      external_id = "a0xxxxxxx1yz"
+      %{id: customer_id} = insert(:customer, %{external_id: "other@test.com", account: account})
+
+      assert {:ok, %Customer{} = customer} =
+               Customers.create_or_update_by_external_id(external_id, account.id)
+
+      assert customer.id != customer_id
+      assert customer.external_id == external_id
+    end
+
+    test "create_or_update_by_external_id/3 creates a new customer with additional params", %{
+      account: account
+    } do
+      external_id = "a0xxxxxxx1yz"
+      %{id: customer_id} = insert(:customer, %{email: "other@test.com", account: account})
+
+      assert {:ok, %Customer{} = customer} =
+               Customers.create_or_update_by_external_id(external_id, account.id, %{
+                 name: "New Customer"
+               })
+
+      assert customer.id != customer_id
+      assert customer.external_id == external_id
+      assert customer.name == "New Customer"
+    end
+
+    test "create_or_update_by_external_id/3 returns an :error tuple if email is nil", %{
+      account: account
+    } do
+      assert {:error, _error} = Customers.create_or_update_by_external_id(nil, account.id)
+
+      assert {:error, _error} =
+               Customers.create_or_update_by_external_id(nil, account.id, %{name: "New Customer"})
     end
   end
 end

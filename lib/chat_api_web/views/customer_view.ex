@@ -1,6 +1,7 @@
 defmodule ChatApiWeb.CustomerView do
   use ChatApiWeb, :view
-  alias ChatApiWeb.{CustomerView, TagView, CSVHelpers}
+  alias ChatApiWeb.{CompanyView, CustomerView, TagView, CSVHelpers}
+  alias ChatApi.Companies.Company
 
   @customer_csv_ordered_fields ~w(id name email created_at updated_at)a ++
                                  ~w(first_seen last_seen phone external_id)a ++
@@ -31,6 +32,7 @@ defmodule ChatApiWeb.CustomerView do
       updated_at: customer.updated_at,
       phone: customer.phone,
       external_id: customer.external_id,
+      profile_photo_url: customer.profile_photo_url,
       company_id: customer.company_id,
       host: customer.host,
       pathname: customer.pathname,
@@ -53,6 +55,7 @@ defmodule ChatApiWeb.CustomerView do
       last_seen: customer.last_seen,
       phone: customer.phone,
       external_id: customer.external_id,
+      profile_photo_url: customer.profile_photo_url,
       company_id: customer.company_id,
       host: customer.host,
       pathname: customer.pathname,
@@ -62,14 +65,15 @@ defmodule ChatApiWeb.CustomerView do
       ip: customer.ip,
       metadata: customer.metadata,
       time_zone: customer.time_zone,
+      company: render_company(customer.company),
       tags: render_tags(customer.tags)
     }
   end
 
   # TODO: figure out a better way to handle this
-  defp render_tags([_ | _] = tags) do
-    render_many(tags, TagView, "tag.json")
-  end
-
+  defp render_tags([_ | _] = tags), do: render_many(tags, TagView, "tag.json")
   defp render_tags(_tags), do: []
+
+  defp render_company(%Company{} = company), do: render_one(company, CompanyView, "company.json")
+  defp render_company(_company), do: nil
 end

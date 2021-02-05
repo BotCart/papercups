@@ -4,7 +4,8 @@ defmodule ChatApi.Factory do
   # Factories
   def account_factory do
     %ChatApi.Accounts.Account{
-      company_name: sequence("some company_name")
+      company_name: sequence("some company_name"),
+      settings: %{}
     }
   end
 
@@ -55,6 +56,7 @@ defmodule ChatApi.Factory do
       last_seen: ~D[2020-01-01],
       email: sequence(:email, &"test-#{&1}@test.com"),
       account: build(:account),
+      company: build(:company),
       customer_tags: [],
       tags: []
     }
@@ -66,6 +68,15 @@ defmodule ChatApi.Factory do
       verified: false,
       webhook_url: "some webhook_url",
       scope: "some scope"
+    }
+  end
+
+  def file_factory do
+    %ChatApi.Files.FileUpload{
+      account: build(:account),
+      filename: sequence("some filename"),
+      file_url: sequence("https://image.jpg"),
+      content_type: "image/png"
     }
   end
 

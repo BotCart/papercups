@@ -50,6 +50,17 @@ body {
   color: #fff;
 }
 
+/* Mimic behavior of antd "text"-type Button */
+a.RelatedCustomerConversation--link {
+  display: block;
+  color: rgba(0, 0, 0, 0.45);
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+a.RelatedCustomerConversation--link:hover {
+  background: rgba(0, 0, 0, 0.018);
+}
+
 /* Replayer */
 #SessionPlayer .replayer-wrapper {
   left: auto !important;
@@ -60,4 +71,22 @@ body {
   border: none;
   border-radius: 4px;
   box-shadow: 0 24px 48px rgba(17, 16, 62, 0.12);
+}
+
+/* Wrapper class for antd Upload component style overrides */
+.AttachFileButton {
+  display: flex;
+  flex-direction: column-reverse;
+  float: left;
+}
+
+.AttachFileButton .ant-upload-list.ant-upload-list-text {
+  display: flex;
+  flex-wrap: wrap;
+  float: right;
+}
+
+.AttachFileButton .ant-upload-list-item {
+  margin-top: 0px;
+  margin-bottom: 4px;
 }

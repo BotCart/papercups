@@ -412,7 +412,6 @@ class ConversationsContainer extends React.Component<Props, State> {
             <ConversationMessages
               messages={messages}
               currentUser={currentUser}
-              customer={selectedCustomer}
               loading={loading}
               isClosing={isClosingSelected}
               showGetStarted={showGetStarted}
@@ -425,6 +424,7 @@ class ConversationsContainer extends React.Component<Props, State> {
               <ConversationFooter
                 key={selectedConversation.id}
                 onSendMessage={this.handleSendMessage}
+                currentUser={currentUser}
               />
             )}
 

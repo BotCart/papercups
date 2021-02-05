@@ -28,6 +28,7 @@ export type Customer = {
   created_at?: string;
   current_url?: string;
   external_id?: any;
+  profile_photo_url?: string;
   first_seen?: any;
   host?: string;
   ip?: string;
@@ -61,13 +62,27 @@ export type Message = {
   sent_at?: string;
   seen_at?: string;
   customer_id?: string;
+  customer?: Customer;
   conversation_id: string;
   user_id?: number;
   user?: User;
+  file_ids?: string[];
+  attachments?: Attachment[];
 };
+
+export type FileUpload = {
+  id: string;
+  filename: string;
+  file_url: string;
+  content_type: string;
+};
+
+// Alias
+export type Attachment = FileUpload;
 
 export type Conversation = {
   id: string;
+  source?: string;
   account_id: string;
   customer_id: string;
   customer: Customer;

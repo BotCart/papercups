@@ -1,5 +1,6 @@
 import React from 'react';
 import {Link} from 'react-router-dom';
+import {Image} from 'theme-ui';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {Box, Flex} from 'theme-ui';
@@ -18,8 +19,10 @@ import {
 import {
   CalendarOutlined,
   GlobalOutlined,
+  LinkOutlined,
   MailOutlined,
   PhoneOutlined,
+  TeamOutlined,
   UserOutlined,
   VideoCameraOutlined,
 } from '../icons';
@@ -28,8 +31,10 @@ import {
   SidebarConversationTags,
 } from './SidebarTagSection';
 import SidebarCustomerNotes from './SidebarCustomerNotes';
+import RelatedCustomerConversations from './RelatedCustomerConversations';
+import SlackConversationThreads from './SlackConversationThreads';
 import * as API from '../../api';
-import {Conversation, Customer} from '../../types';
+import {Company, Conversation, Customer} from '../../types';
 import logger from '../../logger';
 
 // TODO: create date utility methods so we don't have to do this everywhere
@@ -78,6 +83,67 @@ const CustomerActiveSessions = ({customerId}: {customerId: string}) => {
         View live
       </Button>
     </Link>
+  );
+};
+
+const CustomerCompanyDetails = ({customerId}: {customerId: string}) => {
+  const [loading, setLoading] = React.useState(false);
+  const [company, setCompany] = React.useState<Company | null>(null);
+
+  React.useEffect(() => {
+    setLoading(true);
+
+    API.fetchCustomer(customerId)
+      .then((customer) => {
+        const {company} = customer;
+
+        setCompany(company);
+      })
+      .catch((err) => logger.error('Error retrieving company:', err))
+      .then(() => setLoading(false));
+  }, [customerId]);
+
+  if (loading || !company) {
+    return null;
+  }
+
+  const {
+    id: companyId,
+    name = 'Unknown',
+    website_url: websiteUrl,
+    slack_channel_id: slackChannelId,
+    slack_channel_name: slackChannelName,
+  } = company;
+
+  return (
+    <DetailsSectionCard>
+      <Flex mb={2} sx={{alignItems: 'center', justifyContent: 'space-between'}}>
+        <Text strong>Company</Text>
+        <Link to={`/companies/${companyId}`}>
+          <Button size="small">View</Button>
+        </Link>
+      </Flex>
+      <Box mb={1}>
+        <TeamOutlined /> {name}
+      </Box>
+      {websiteUrl && (
+        <Box mb={1}>
+          <LinkOutlined /> {websiteUrl || 'Unknown'}
+        </Box>
+      )}
+      {slackChannelId && slackChannelName && (
+        <Box mb={1}>
+          <Image src="/slack.svg" alt="Slack" sx={{height: 16, mr: 1}} />
+          <a
+            href={`https://slack.com/app_redirect?channel=${slackChannelId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {slackChannelName}
+          </a>
+        </Box>
+      )}
+    </DetailsSectionCard>
   );
 };
 
@@ -237,6 +303,8 @@ const CustomerDetails = ({
         </Box>
       </DetailsSectionCard>
 
+      <CustomerCompanyDetails customerId={customerId} />
+
       <DetailsSectionCard>
         <Box mb={2}>
           <Text strong>Customer Notes</Text>
@@ -287,7 +355,7 @@ const openShareConversationUrlNotification = (url: string) => {
 };
 
 const ConversationDetails = ({conversation}: {conversation: Conversation}) => {
-  const {id: conversationId, status} = conversation;
+  const {id: conversationId, status, source} = conversation;
 
   const share = () => {
     API.generateShareConversationToken(conversationId)
@@ -322,11 +390,14 @@ const ConversationDetails = ({conversation}: {conversation: Conversation}) => {
           <Text>{conversationId.toLowerCase()}</Text>
         </Tooltip>
       </Box>
-      <Box px={2} mb={3}>
+      <Box px={2} mb={1}>
         <Text type="secondary">Status:</Text>{' '}
         <Tag color={status === 'open' ? colors.primary : colors.red}>
           {status}
         </Tag>
+      </Box>
+      <Box px={2} mb={3}>
+        <Text type="secondary">Source:</Text> <Tag>{source}</Tag>
       </Box>
 
       <DetailsSectionCard>
@@ -334,6 +405,22 @@ const ConversationDetails = ({conversation}: {conversation: Conversation}) => {
           <Text strong>Conversation Tags</Text>
         </Box>
         <SidebarConversationTags conversationId={conversationId} />
+      </DetailsSectionCard>
+
+      <DetailsSectionCard>
+        <Box mb={2}>
+          <Text strong>Latest conversations</Text>
+        </Box>
+        <Box mx={-2} mb={-2}>
+          <RelatedCustomerConversations conversationId={conversationId} />
+        </Box>
+      </DetailsSectionCard>
+
+      <DetailsSectionCard>
+        <Box mb={2}>
+          <Text strong>Slack threads</Text>
+        </Box>
+        <SlackConversationThreads conversationId={conversationId} />
       </DetailsSectionCard>
 
       <Box px={2} mt={3} mb={3}>
