@@ -50,11 +50,13 @@ export type Company = {
   external_id?: string;
   slack_channel_id?: string;
   slack_channel_name?: string;
+  updated_at: string;
 };
 
 export type MessageType = 'reply' | 'note';
 
 export type Message = {
+  id: string;
   body: string;
   type?: 'reply' | 'note';
   private?: boolean;
@@ -110,6 +112,8 @@ export type Tag = {
   id: string;
   name: string;
   description?: string;
+  color?: string;
+  updated_at: string;
 };
 
 export type BrowserSession = {

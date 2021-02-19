@@ -3,7 +3,7 @@ defmodule ChatApiWeb.SlackController do
 
   require Logger
 
-  alias ChatApi.{Slack, SlackAuthorizations}
+  alias ChatApi.{Conversations, Slack, SlackAuthorizations}
   alias ChatApi.SlackAuthorizations.SlackAuthorization
 
   action_fallback(ChatApiWeb.FallbackController)
@@ -29,15 +29,24 @@ defmodule ChatApiWeb.SlackController do
          } <- body,
          %{"id" => authed_user_id} <- authed_user,
          %{"id" => team_id, "name" => team_name} <- team,
+         # TODO: validate that `channel_id` doesn't match account integration with different `type`
          %{
            "channel" => channel,
            "channel_id" => channel_id,
            "configuration_url" => configuration_url,
            "url" => webhook_url
-         } <- incoming_webhook do
-      integration_type = Map.get(params, "type", "reply")
-
-      params = %{
+         } <- incoming_webhook,
+         integration_type <- Map.get(params, "type", "reply"),
+         :ok <-
+           Slack.Validation.validate_authorization_channel_id(
+             channel_id,
+             account_id,
+             integration_type
+           ) do
+      # TODO: after creating, check if connected channel is private;
+      # If yes, use webhook_url to send notification that Papercups app needs
+      # to be added manually, along with instructions for how to do so
+      SlackAuthorizations.create_or_update(account_id, %{
         account_id: account_id,
         access_token: access_token,
         app_id: app_id,
@@ -52,12 +61,7 @@ defmodule ChatApiWeb.SlackController do
         team_name: team_name,
         webhook_url: webhook_url,
         type: integration_type
-      }
-
-      # TODO: after creating, check if connected channel is private;
-      # If yes, use webhook_url to send notification that Papercups app needs
-      # to be added manually, along with instructions for how to do so
-      SlackAuthorizations.create_or_update(account_id, params)
+      })
 
       cond do
         integration_type == "reply" && Slack.Helpers.is_private_slack_channel?(channel_id) ->
@@ -81,10 +85,25 @@ defmodule ChatApiWeb.SlackController do
 
       json(conn, %{data: %{ok: true}})
     else
-      error ->
-        Logger.error(error)
+      {:error, :duplicate_channel_id} ->
+        conn
+        |> put_status(400)
+        |> json(%{
+          error: %{
+            status: 400,
+            message: """
+            This Slack channel has already been connected with another integration.
+            Please select another channel, or disconnect the other integration and try again.
+            """
+          }
+        })
 
-        raise "OAuth access denied: #{inspect(error)}"
+      error ->
+        Logger.error(inspect(error))
+
+        conn
+        |> put_status(401)
+        |> json(%{error: %{status: 401, message: "OAuth access denied: #{inspect(error)}"}})
     end
   end
 
@@ -144,6 +163,23 @@ defmodule ChatApiWeb.SlackController do
     end
   end
 
+  @spec actions(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def actions(conn, %{"payload" => json}) do
+    Logger.debug("Payload from Slack action: #{inspect(json)}")
+
+    with {:ok, %{"actions" => actions}} <- Jason.decode(json) do
+      Enum.each(actions, &handle_action/1)
+    end
+
+    send_resp(conn, 200, "")
+  end
+
+  def actions(conn, params) do
+    Logger.debug("Payload from unhandled Slack action: #{inspect(params)}")
+
+    send_resp(conn, 200, "")
+  end
+
   @spec channels(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def channels(conn, payload) do
     # TODO: figure out the best way to handle errors here... should we just return
@@ -155,6 +191,43 @@ defmodule ChatApiWeb.SlackController do
          {:ok, result} <- Slack.Client.list_channels(access_token),
          %{body: %{"ok" => true, "channels" => channels}} <- result do
       json(conn, %{data: channels})
+    end
+  end
+
+  @spec handle_action(map()) :: any()
+  def handle_action(%{
+        "action_id" => "close_conversation",
+        "type" => "button",
+        "action_ts" => _action_ts,
+        "value" => conversation_id
+      }) do
+    conversation_id
+    |> Conversations.get_conversation!()
+    |> Conversations.update_conversation(%{"status" => "closed"})
+    |> case do
+      {:ok, conversation} ->
+        Conversations.Helpers.broadcast_conversation_updates_to_slack(conversation)
+
+      _ ->
+        nil
+    end
+  end
+
+  def handle_action(%{
+        "action_id" => "open_conversation",
+        "type" => "button",
+        "action_ts" => _action_ts,
+        "value" => conversation_id
+      }) do
+    conversation_id
+    |> Conversations.get_conversation!()
+    |> Conversations.update_conversation(%{"status" => "open"})
+    |> case do
+      {:ok, conversation} ->
+        Conversations.Helpers.broadcast_conversation_updates_to_slack(conversation)
+
+      _ ->
+        nil
     end
   end
 
